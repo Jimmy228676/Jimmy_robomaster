@@ -12,6 +12,7 @@ int red_s = 120, red_v = 60;
 int open_size = 2;
 int close_size = 6;
 
+// return the num of son in hierarchy
 int num_of_son(const std::vector< std::vector<cv::Point> > &contours,
                const std::vector< cv::Vec4i > &hierarchy, const int &id)
 {
@@ -35,6 +36,7 @@ int num_of_son(const std::vector< std::vector<cv::Point> > &contours,
     return son_num;
 }
 
+// judge the contour. based on area\the length of its rotated rectangle/ratio of the rotated rectangle
 bool isValid(const std::vector< std::vector<cv::Point> > &contours,
              const std::vector< cv::Vec4i > &hierarchy,
              const int &id,
@@ -50,7 +52,6 @@ bool isValid(const std::vector< std::vector<cv::Point> > &contours,
     {
         std::swap(big_length, small_length);
     }
-    //std::cout<<area<<' '<<big_length<<' '<<small_length<<std::endl;
     if(area<max_area && area>min_area && big_length>big_length_min && small_length>small_length_min &&
         big_length/small_length > ratio_min && big_length/small_length < ratio_max)
     {
@@ -59,7 +60,7 @@ bool isValid(const std::vector< std::vector<cv::Point> > &contours,
     return false;
 }
 
-// draw the hull or ellipse of the fan or "R"
+// draw the hull of the fan
 void draw_fan(const std::vector< std::vector<cv::Point> > &contours,
                const std::vector< cv::Vec4i > &hierarchy, const int &id, cv::Mat &drawing, const cv::Point &center)
 {
@@ -69,21 +70,22 @@ void draw_fan(const std::vector< std::vector<cv::Point> > &contours,
     int son_num = num_of_son(contours, hierarchy, id);
     if(son_num == 1)
     {
-        // the thin one
+        // the thin fan
         if(isValid(contours, hierarchy, id, 5000, 80, 30))
         {
             int son_id = hierarchy[id][2];
             std::vector<cv::Point> father_hull;
-            // find the target point of the father hull
+            // find the tail(target_point) of the father hull
             convexHull(cv::Mat(contours[id]), father_hull, false);
             cv::Point target_point;
             for(auto& point : father_hull)
             {
-                // selected the nearest point from the center
+                // selected the nearest point from the center "R"
                 if((point-center).ddot(point-center) < (target_point-center).ddot(target_point-center))
                 { target_point = point; }
             }
-            std::vector<std::vector<cv::Point>> result_hull(2);
+            // add target_point to the output hull
+            std::vector<std::vector<cv::Point>> result_hull(2); // the first one is tmp, the second one is final output
             convexHull(cv::Mat(contours[son_id]), result_hull[0], false);
             result_hull[0].push_back(target_point);
             convexHull(cv::Mat(result_hull[0]), result_hull[1], false);
@@ -93,7 +95,7 @@ void draw_fan(const std::vector< std::vector<cv::Point> > &contours,
     }
     else if(son_num > 1)
     {
-        // the fat one
+        // the fat fan
         if(isValid(contours, hierarchy, id, 5000, 80, 30))
         {
             bool flag = false; // whether find the target
@@ -110,24 +112,24 @@ void draw_fan(const std::vector< std::vector<cv::Point> > &contours,
             if(!flag) { return; }
 
             std::vector<cv::Point> father_hull;
-            // find the target point of the father hull
+            // find the tail(target_point) of the father hull
             convexHull(cv::Mat(contours[id]), father_hull, false);
             cv::Point tmp_point1=father_hull[0], tmp_point2(0,0), target_point;
+            // selected the first two nearest point from the center, and the target_point is their average
             for(auto& point : father_hull)
             {
-                // selected the 2 nearest point from the center
                 if((point-center).ddot(point-center) < (tmp_point1-center).ddot(tmp_point1-center))
                 { tmp_point1 = point; }
             }
             for(auto& point : father_hull)
             {
                 if(point==tmp_point1) { continue; }
-                // selected the 2 nearest point from the center
                 if((point-center).ddot(point-center) < (tmp_point2-center).ddot(tmp_point2-center))
                 { tmp_point2 = point; }
             }
             target_point = (tmp_point1 + tmp_point2) / 2;
-            std::vector<std::vector<cv::Point>> result_hull(2);
+            // add target_point to the output hull
+            std::vector<std::vector<cv::Point>> result_hull(2); // the first one is tmp, the second one is final output
             convexHull(cv::Mat(contours[son_id]), result_hull[0], false);
             result_hull[0].push_back(target_point);
             convexHull(cv::Mat(result_hull[0]), result_hull[1], false);
@@ -137,10 +139,9 @@ void draw_fan(const std::vector< std::vector<cv::Point> > &contours,
 
 }
 
-cv::Mat src;
-char win_name[] = "set_para";
+//char win_name[] = "set_para"; // for trackbar windows
 
-void draw_all(int ,void *)
+void draw_all(cv::Mat &src, cv::Mat &dst)
 {
     // change color space from rgb to hsv
     cv::Mat hsv;
@@ -169,13 +170,13 @@ void draw_all(int ,void *)
         cv::morphologyEx(result, result, cv::MORPH_CLOSE, element2);
     }
 
-    // find & filtrate & draw contours
+    // find contours
     std::vector< std::vector<cv::Point> > contours;
     std::vector< cv::Vec4i > hierarchy;
     cv::findContours( result, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE);
-    cv::Mat result_src = src.clone(); // warning: should not draw on the src, because src is global valuable
+    dst = src.clone(); // warning: should not draw on the src, because src is global valuable
 
-    // find center
+    // find center "R" coordinate, and draw the circle
     cv::Point2f center;
     bool isFindCenter = false;
     for (int i = 0; i != -1; i = hierarchy[i][0])
@@ -185,38 +186,42 @@ void draw_all(int ,void *)
         {
             float radius;
             minEnclosingCircle(contours[i],center, radius);
-            circle(result_src,center,(int)radius,cv::Scalar(255,255,255),2);
+            circle(dst,center,(int)radius,cv::Scalar(255,255,255),2);
             isFindCenter = true;
             break;
         }
     }
     if(!isFindCenter) { return; }
 
-
     for (int i = 0; i != -1; i = hierarchy[i][0])
     {
-        draw_fan(contours, hierarchy, i, result_src, center);
+        // draw for the fans
+        draw_fan(contours, hierarchy, i, dst, center);
     }
 
-    //imshow(win_name,result);
-    imshow("energy",result_src);
+    //imshow(win_name,result); // trackbar windows
+    //imshow("energy",dst);
 }
 
 int main()
 {
-    cv::VideoCapture capture(PROJECT_DIR"/video.mp4");
+    cv::VideoCapture capture(PROJECT_DIR"/video2.mp4");
 
+    cv::Mat src, dst;
     for(int i = 0; i<10; ++i)
     {
         capture.read(src);
     }
-
+    assert(!src.empty());
+    cv::VideoWriter writer(PROJECT_DIR"/video2_output.avi",
+                           cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
+                           50, cv::Size(src.cols, src.rows), true);
     while(capture.read(src))
     {
-        draw_all(0, nullptr);
-        cv::waitKey(50);
+        draw_all(src, dst);
+        writer << dst;
     }
-
+    writer.release();
     /*
     // trackbars for setting the parameters
     namedWindow(win_name,cv::WINDOW_AUTOSIZE);
@@ -227,6 +232,7 @@ int main()
     cv::createTrackbar("open_cal：",win_name,&open_size,20,draw_all);
     cv::createTrackbar("close_cal：",win_name,&close_size,20,draw_all);
     */
+
     cv::waitKey(0);
     return 0;
 }
