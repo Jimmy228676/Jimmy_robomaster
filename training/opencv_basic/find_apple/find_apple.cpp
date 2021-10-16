@@ -70,12 +70,12 @@ int main()
 
     namedWindow(win_name,cv::WINDOW_AUTOSIZE);
     // trackbars for setting the parameters
-    cv::createTrackbar("red_h_left：",win_name,&red_h1,50,para_track);
-    cv::createTrackbar("red_h_right：",win_name,&red_h2,180,para_track);
-    cv::createTrackbar("red_s：",win_name,&red_s,200,para_track);
-    cv::createTrackbar("red_v：",win_name,&red_v,100,para_track);
-    cv::createTrackbar("open_cal：",win_name,&open_size,20,para_track);
-    cv::createTrackbar("close_cal：",win_name,&close_size,20,para_track);
+    cv::createTrackbar("red_h_left:",win_name,&red_h1,50,para_track);
+    cv::createTrackbar("red_h_right:",win_name,&red_h2,180,para_track);
+    cv::createTrackbar("red_s:",win_name,&red_s,200,para_track);
+    cv::createTrackbar("red_v:",win_name,&red_v,100,para_track);
+    cv::createTrackbar("open_cal:",win_name,&open_size,20,para_track);
+    cv::createTrackbar("close_cal:",win_name,&close_size,20,para_track);
 
     cv::waitKey(0);
     return 0;
